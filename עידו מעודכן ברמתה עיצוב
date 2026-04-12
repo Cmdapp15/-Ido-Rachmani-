@@ -1,0 +1,48 @@
+Role: Expert Full-Stack Developer (Firebase & UI Specialist).
+Task: Fix the broken Authentication flow and Payment logic in the provided HTML file.
+
+CRITICAL CONSTRAINTS (THE "RAILS"):
+
+Visual Integrity: Do NOT change the CSS, the "Inter" font, the spacing, or the minimalist white aesthetic. The UI is perfect; do not "improve" it on your own initiative.
+
+Structure: Maintain the current modal sizes (max-w-md). Do NOT revert to full-screen modals.
+
+Branding: Keep the name "Naomi's English SAT" and the current logo/icons.
+
+SPECIFIC TECHNICAL BUGS TO FIX:
+
+1. The "Ghost Login" Bug:
+
+Issue: After clicking "Continue" in the login modal, the UI doesn't refresh, and the modal stays open even if the login is successful.
+
+Fix: In the auth.onAuthStateChanged listener, you must ensure a clean state transition. If a user is logged in:
+
+Call closeAuthModal() immediately.
+
+Update nav-user and profile-email with the actual user data.
+
+Run a function to re-render the tests/solutions grid (render()) so the "Lock" icons update based on isPremium status.
+
+2. The PayPal/Payment Visibility:
+
+Issue: The PayPal button ($250) is either missing or doesn't recognize the user's connection status.
+
+Fix: Ensure the #paypal-btn is linked correctly to the #legal-agree checkbox. The button must only become active (disabled class removed) when the box is checked.
+
+Logic: Ensure that the payment link provided (https://www.paypal.com/ncp/payment/Q3WJGWYM45VWA) remains the destination.
+
+3. Password Reset Flow:
+
+Issue: The "Forgot Password" link is currently unresponsive or lacks feedback.
+
+Fix: Ensure auth.sendPasswordResetEmail(email) provides a clear visual success message in the #auth-error div (change it to a green success color for this action) so the user knows the email was sent.
+
+4. Device Security Logic:
+
+Validation: Verify that the deviceId logic in localStorage actually prevents access if deviceBlocked is true. Ensure that when a user logs out, the current device is removed from the Firestore devices collection to free up the slot.
+
+5. Content Grid:
+
+Ensure the tests and solutions arrays are fully populated (10 items each) and that the render() function correctly handles the locking logic: (Locked if !item.free && !isPremium).
+
+Output Requirement: Provide the entire HTML file with these logic fixes integrated. Do not skip any parts of the code.
