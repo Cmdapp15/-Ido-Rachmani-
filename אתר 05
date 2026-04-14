@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naomi's English SAT | Member Portal</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- UI & Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #1a1a1a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .content-card {
+            border: 1.5px solid #e2e8f0;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #fff;
+            width: 100%;
+        }
+
+        .card-free { border-color: #dcfce7; }
+        .card-locked { border-color: #f1f5f9; opacity: 0.5; }
+        .card-locked span { color: #94a3b8; }
+
+        .modal-overlay {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        .paypal-gold {
+            background-color: #ffc439;
+            color: #003087;
+            font-weight: 700;
+            border-radius: 12px;
+        }
+        
+        .paypal-gold.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .btn-primary {
+            background-color: #000;
+            color: #fff;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:hover { opacity: 0.85; }
+    </style>
+</head>
+<body class="bg-white">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md px-6 py-4 border-b border-gray-100">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-black text-white font-black flex items-center justify-center rounded text-sm">N</div>
+                <span class="text-[10px] font-black uppercase tracking-widest hidden md:block">Naomi English SAT</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="device-pill" class="hidden text-[9px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full uppercase tracking-widest border border-blue-100">Devices: 1/2</div>
+                <span id="nav-user" class="hidden text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[120px]">Guest</span>
+                <button id="auth-trigger" onclick="openAuthModal()" class="text-[10px] font-black uppercase bg-black text-white px-5 py-2.5 rounded-full hover:bg-gray-800 transition-all">Account Portal</button>
+                <button id="logout-trigger" onclick="handleLogout()" class="hidden text-gray-400 hover:text-red-500 w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-32 pb-20 px-6 max-w-xl mx-auto text-center">
+        <header class="mb-12">
+            <h1 class="text-4xl font-extrabold tracking-tight mb-4 italic">Naomi's English SAT</h1>
+        </header>
+
+        <div id="main-grid" class="grid grid-cols-2 gap-4">
+            <!-- Items injected by JS -->
+        </div>
+    </main>
+
+    <!-- Portal Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center modal-overlay p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl relative p-8 border border-gray-100">
+            <button onclick="closeAuthModal()" class="absolute top-6 right-6 text-gray-300">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <!-- GUEST VIEW -->
+            <div id="guest-view">
+                <h3 class="text-2xl font-black mb-1">Member Access</h3>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Sign in to your portal</p>
+                
+                <form id="auth-form" class="space-y-3">
+                    <input type="email" id="email" placeholder="Email" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none" required>
+                    <input type="password" id="pass" placeholder="Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none" required>
+                    <div id="signup-extra" class="hidden">
+                        <input type="password" id="pass-confirm" placeholder="Confirm Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none">
+                    </div>
+                    <div id="auth-error" class="hidden text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest"></div>
+                    <button type="submit" class="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest">Continue</button>
+                </form>
+                
+                <div class="mt-6 flex flex-col gap-3">
+                    <button onclick="toggleAuthMode()" id="toggle-text" class="text-[9px] font-black text-gray-400 uppercase tracking-widest block w-full text-center">New here? Create account</button>
+                    <button onclick="handleResetPassword()" id="reset-text" class="text-[9px] font-black text-blue-400 uppercase tracking-widest block w-full text-center">Forgot Password?</button>
+                </div>
+            </div>
+
+            <!-- USER VIEW -->
+            <div id="user-view" class="hidden">
+                <h3 class="text-2xl font-black mb-1 truncate" id="profile-email-display">Profile</h3>
+                <p id="profile-status" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Standard Access</p>
+                
+                <div id="upgrade-section">
+                    <div class="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                        <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Premium Pass</span>
+                        <div class="text-3xl font-black mt-1">$250.00</div>
+                        <p class="text-[10px] text-gray-400 mt-2 font-bold uppercase">Lifetime Full Access</p>
+                    </div>
+
+                    <div class="flex items-start gap-2 mb-4">
+                        <input type="checkbox" id="legal-agree" onchange="togglePayButton()" class="mt-1">
+                        <label for="legal-agree" class="text-[9px] font-bold text-gray-400 uppercase leading-relaxed cursor-pointer">I agree to final sale policy.</label>
+                    </div>
+                    
+                    <a href="https://www.paypal.com/ncp/payment/Q3WJGWYM45VWA" id="paypal-btn" target="_blank" class="paypal-gold disabled w-full py-4 flex items-center justify-center gap-2">
+                        <i class="fab fa-paypal text-lg"></i>
+                        <span class="text-sm">Pay with PayPal</span>
+                    </a>
+                </div>
+
+                <div id="premium-msg" class="hidden text-center py-8 bg-green-50 rounded-3xl border border-green-100">
+                    <i class="fas fa-crown text-green-500 text-2xl mb-2"></i>
+                    <p class="font-bold text-green-700 uppercase text-[10px] tracking-widest">Premium Active</p>
+                </div>
+
+                <button onclick="handleLogout()" class="w-full mt-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Viewer Modal -->
+    <div id="viewer-modal" class="fixed inset-0 z-[150] hidden flex flex-col bg-white">
+        <div class="p-4 border-b flex justify-between items-center">
+            <span id="viewer-title" class="text-[10px] font-black uppercase tracking-widest text-gray-400 truncate px-4">Material</span>
+            <button onclick="closeViewer()" class="bg-gray-100 px-6 py-2.5 rounded-full text-[10px] font-black uppercase">Close</button>
+        </div>
+        <iframe id="pdf-frame" class="w-full h-full border-none"></iframe>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGIT_bZ6nfoJjfipsPygC-BW9LoZeFflI",
+            authDomain: "naomi-sat.firebaseapp.com",
+            projectId: "cmds-36e71",
+            storageBucket: "cmds-36e71.appspot.com",
+            messagingSenderId: "1036067758252", 
+            appId: "1:1036067758252:web:65e12f6a5e1d5a6b7d90c1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let isPremium = false;
+        let isSignUp = false;
+
+        // Auto-format Google Drive links for Iframe
+        function formatDriveUrl(url) {
+            if (url === '#' || !url) return '#';
+            return url.replace(/\/view.*$/, '/preview');
+        }
+
+        // Updated materials list with your provided links
+        const materials = [
+            { title: "Test 1", url: "https://drive.google.com/file/d/1NF4G5V05IAHAgKT7iDth2TzHwsaXVYuA/view?usp=drivesdk", free: true },
+            { title: "Solutions 1", url: "https://drive.google.com/file/d/1ivSyFwhkDqOwd5lWVcAySnHKq5cfi9cB/view?usp=drivesdk", free: true },
+            { title: "Test 2", url: "https://drive.google.com/file/d/1vCxb3IBAOvnIjcgnY21BNmBw0P4DE-ji/view?usp=drivesdk", free: false },
+            { title: "Solutions 2", url: "https://drive.google.com/file/d/19Vtn9xF42xuCcf8NUOyu3u4tdSfWjvfV/view?usp=drivesdk", free: false },
+            { title: "Test 3", url: "https://drive.google.com/file/d/1F5Vy5D8uLI5krrpmvfUv-bd-tmfoOuZt/view?usp=drivesdk", free: false },
+            { title: "Solutions 3", url: "https://drive.google.com/file/d/1bAGoCxGGM0xoT0Qjh-PK_lqK8ACByRZs/view?usp=sharing", free: false },
+            { title: "Test 4", url: "https://drive.google.com/file/d/1DwvqaFvb2TAvsC2IXjeQwLapvzal5oF7/view?usp=drivesdk", free: false },
+            { title: "Solutions 4", url: "https://drive.google.com/file/d/1kzfAwcMCabic1wAv2vGgVMC5DFNuo-Oj/view?usp=drivesdk", free: false },
+            { title: "Test 5", url: "https://drive.google.com/file/d/1h9HhApxilRScr_azmtrws0lqkrE65gLa/view?usp=drivesdk", free: false },
+            { title: "Solutions 5", url: "https://drive.google.com/file/d/1ibnhezNlJzBCcUlYeaZRsUuqC2ybfIXA/view?usp=drivesdk", free: false },
+            { title: "Test 6", url: "https://drive.google.com/file/d/1oDwiF868KsUkp4lUJxiXORuA97QkWIWL/view?usp=drivesdk", free: false },
+            { title: "Solutions 6", url: "https://drive.google.com/file/d/137vLnnqhuWCYpvpvhKc0-Kjj2QIdQxO3/view?usp=drivesdk", free: false },
+            { title: "Test 7", url: "https://drive.google.com/file/d/1oDwiF868KsUkp4lUJxiXORuA97QkWIWL/view?usp=drivesdk", free: false },
+            { title: "Solutions 7", url: "https://drive.google.com/file/d/1oLZYUt-43fLiTaAlA-42VOgJv1fgymDc/view?usp=drivesdk", free: false },
+            { title: "Test 8", url: "https://drive.google.com/file/d/1-iMyUwmXKaG5IGILrzemhlBp9kVDclgN/view?usp=drivesdk", free: false },
+            { title: "Solutions 8", url: "https://drive.google.com/file/d/12IajQ6FWXQa3SHKERNrElYWLkN1CPlB7/view?usp=drivesdk", free: false },
+            { title: "Test 9", url: "https://drive.google.com/file/d/1_i8x_ltHGkFbKURkBXvsQkypGGrYOeS-/view?usp=drivesdk", free: false },
+            { title: "Solutions 9", url: "https://drive.google.com/file/d/1fj3Hb6N6Dhx41BsEK2wUORvj6DRjzfP7/view?usp=drivesdk", free: false },
+            { title: "Test 10", url: "https://drive.google.com/file/d/1QIqtnxG0lyREeKZLOrFE1UTxQHFvH9Jw/view?usp=drivesdk", free: false },
+            { title: "Solutions 10", url: "https://drive.google.com/file/d/1SVCkbSbII_Vwew4CZL-DgmLnz4i_j23W/view?usp=drivesdk", free: false }
+        ];
+
+        auth.onAuthStateChanged(async user => {
+            updateUIState(user);
+        });
+
+        async function updateUIState(user) {
+            const authTrigger = document.getElementById('auth-trigger');
+            const logoutTrigger = document.getElementById('logout-trigger');
+            const navUser = document.getElementById('nav-user');
+            const devicePill = document.getElementById('device-pill');
+
+            if (user) {
+                authTrigger.classList.add('hidden');
+                logoutTrigger.classList.remove('hidden');
+                navUser.classList.remove('hidden');
+                navUser.innerText = user.email;
+
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                isPremium = userDoc.exists ? userDoc.data().isPremium : false;
+
+                document.getElementById('profile-email-display').innerText = user.email;
+                document.getElementById('profile-status').innerText = isPremium ? "Premium Member" : "Standard Access";
+                document.getElementById('upgrade-section').classList.toggle('hidden', isPremium);
+                document.getElementById('premium-msg').classList.toggle('hidden', !isPremium);
+                
+                if (isPremium) devicePill.classList.remove('hidden');
+                
+                if (!document.getElementById('auth-modal').classList.contains('hidden')) {
+                    document.getElementById('guest-view').classList.add('hidden');
+                    document.getElementById('user-view').classList.remove('hidden');
+                }
+            } else {
+                isPremium = false;
+                authTrigger.classList.remove('hidden');
+                logoutTrigger.classList.add('hidden');
+                navUser.classList.add('hidden');
+                devicePill.classList.add('hidden');
+                
+                if (!document.getElementById('auth-modal').classList.contains('hidden')) {
+                    document.getElementById('guest-view').classList.remove('hidden');
+                    document.getElementById('user-view').classList.add('hidden');
+                }
+            }
+            render();
+        }
+
+        function render() {
+            const grid = document.getElementById('main-grid');
+            grid.innerHTML = '';
+            materials.forEach(item => {
+                const locked = !item.free && !isPremium;
+                const card = document.createElement('div');
+                card.className = `content-card ${locked ? 'card-locked' : 'card-free cursor-pointer'}`;
+                
+                card.onclick = () => {
+                    if (locked) openAuthModal();
+                    else if (item.url !== '#') openViewer(formatDriveUrl(item.url), item.title);
+                };
+
+                card.innerHTML = `
+                    ${locked ? '<i class="fas fa-lock absolute left-5 text-gray-200 text-[10px]"></i>' : ''}
+                    <span class="font-bold text-[14px]">${item.title}</span>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        document.getElementById('auth-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('pass').value;
+            const errorEl = document.getElementById('auth-error');
+            errorEl.classList.add('hidden');
+
+            try {
+                if (isSignUp) {
+                    const res = await auth.createUserWithEmailAndPassword(email, pass);
+                    await db.collection('users').doc(res.user.uid).set({ email, isPremium: false });
+                } else {
+                    await auth.signInWithEmailAndPassword(email, pass);
+                }
+            } catch (err) {
+                errorEl.innerText = err.message;
+                errorEl.className = 'text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest text-red-500 border-red-100 bg-red-50';
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        async function handleResetPassword() {
+            const email = document.getElementById('email').value;
+            const errorEl = document.getElementById('auth-error');
+            if (!email) {
+                errorEl.innerText = "Enter email first";
+                errorEl.className = 'text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest text-orange-500 border-orange-100 bg-orange-50';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            try {
+                await auth.sendPasswordResetEmail(email);
+                errorEl.innerText = "Reset link sent to email";
+                errorEl.className = 'text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest text-green-500 border-green-100 bg-green-50';
+                errorEl.classList.remove('hidden');
+            } catch (err) {
+                errorEl.innerText = err.message;
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function toggleAuthMode() {
+            isSignUp = !isSignUp;
+            document.getElementById('signup-extra').classList.toggle('hidden', !isSignUp);
+            document.getElementById('toggle-text').innerText = isSignUp ? 'Existing Member? Login' : 'New here? Create account';
+        }
+
+        function openAuthModal() {
+            const user = auth.currentUser;
+            document.getElementById('guest-view').classList.toggle('hidden', !!user);
+            document.getElementById('user-view').classList.toggle('hidden', !user);
+            document.getElementById('auth-modal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+        
+        function togglePayButton() {
+            const checked = document.getElementById('legal-agree').checked;
+            document.getElementById('paypal-btn').classList.toggle('disabled', !checked);
+        }
+
+        async function handleLogout() {
+            await auth.signOut();
+            closeAuthModal();
+        }
+
+        function openViewer(url, title) {
+            document.getElementById('viewer-title').innerText = title;
+            document.getElementById('pdf-frame').src = url;
+            document.getElementById('viewer-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeViewer() {
+            document.getElementById('viewer-modal').classList.add('hidden');
+            document.getElementById('pdf-frame').src = "";
+            document.body.style.overflow = 'auto';
+        }
+    </script>
+</body>
+</html>
