@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naomi's English SAT | Member Portal</title>
+    
+    <!-- Firebase SDKs (Compatibility Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+    
+    <!-- UI & Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #1a1a1a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .content-card {
+            border: 1.5px solid #e2e8f0;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #fff;
+            width: 100%;
+        }
+
+        .content-card:hover:not(.card-locked) {
+            transform: translateY(-2px);
+            border-color: #000;
+        }
+
+        .card-free { border-color: #dcfce7; }
+        .card-locked { border-color: #f1f5f9; opacity: 0.6; cursor: pointer; }
+        .card-locked span { color: #94a3b8; }
+
+        .modal-overlay {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #000;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .paypal-gold {
+            background-color: #ffc439;
+            color: #003087;
+            font-weight: 700;
+            border-radius: 12px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        
+        .paypal-gold.disabled {
+            background-color: #f1f5f9;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        #auth-modal.hidden, #terms-modal.hidden { display: none; }
+        .transition-all { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-white flex flex-col min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md px-6 py-4 border-b border-gray-100">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-black text-white font-black flex items-center justify-center rounded text-sm">N</div>
+                <span class="text-[10px] font-black uppercase tracking-widest hidden md:block">Naomi English SAT</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div id="guest-controls" class="flex items-center gap-2">
+                    <button onclick="openAuthModal(false)" class="text-[10px] font-black uppercase border border-black px-4 py-2.5 rounded-full hover:bg-gray-50 transition-all">Login</button>
+                    <button onclick="openAuthModal(true)" class="text-[10px] font-black uppercase bg-black text-white px-4 py-2.5 rounded-full hover:bg-gray-800 transition-all">Sign Up</button>
+                </div>
+
+                <div id="user-controls" class="hidden flex items-center gap-3">
+                    <div class="flex flex-col items-end">
+                        <span id="nav-user-email" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[120px]">Email</span>
+                        <span id="nav-user-status" class="text-[9px] font-black px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 uppercase">Standard</span>
+                    </div>
+                    <button id="logout-trigger" onclick="handleLogout()" class="text-gray-400 hover:text-red-500 w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center transition-colors">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-32 pb-20 px-6 max-w-xl mx-auto text-center flex-grow">
+        <header class="mb-12">
+            <h1 class="text-4xl font-extrabold tracking-tight mb-4 italic">Naomi's English SAT</h1>
+            <p class="text-gray-400 text-sm uppercase font-bold tracking-widest">Digital Learning Materials</p>
+        </header>
+
+        <div id="main-grid" class="grid grid-cols-2 gap-4"></div>
+    </main>
+
+    <!-- Portal Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center modal-overlay p-4">
+        <div class="absolute inset-0" onclick="closeAuthModal()"></div>
+        
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl relative p-8 border border-gray-100" onclick="event.stopPropagation()">
+            <button onclick="closeAuthModal()" class="absolute top-6 right-6 text-gray-300 hover:text-black transition-colors">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <!-- GUEST VIEW -->
+            <div id="guest-view">
+                <h3 id="auth-title" class="text-2xl font-black mb-1">Member Access</h3>
+                <p id="auth-subtitle" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Sign in to your portal</p>
+                
+                <form id="auth-form" class="space-y-3">
+                    <div id="email-wrapper">
+                        <input type="email" id="email" placeholder="Email Address" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none transition-all" required>
+                    </div>
+
+                    <div id="verification-wrapper" class="hidden">
+                        <p id="reset-email-confirm" class="text-[9px] text-center font-bold text-blue-500 mb-2 uppercase"></p>
+                        <input type="text" id="verification-code" maxlength="6" placeholder="6-Digit Code" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-blue-200 outline-none text-center font-bold tracking-[0.5em]">
+                    </div>
+
+                    <div id="new-password-wrapper" class="hidden space-y-3">
+                        <input type="password" id="new-pass" placeholder="New Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none transition-all">
+                        <input type="password" id="new-pass-confirm" placeholder="Confirm New Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none transition-all">
+                    </div>
+                    
+                    <div id="password-wrapper">
+                        <input type="password" id="pass" placeholder="Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none transition-all">
+                    </div>
+                    
+                    <div id="signup-extra" class="hidden space-y-3">
+                        <input type="password" id="pass-confirm" placeholder="Confirm Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm border border-transparent focus:border-gray-200 outline-none transition-all">
+                    </div>
+
+                    <div id="auth-error" class="hidden text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest overflow-hidden"></div>
+                    
+                    <button type="submit" id="auth-submit-btn" class="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:bg-gray-800">
+                        <span id="auth-btn-text">Continue</span>
+                        <div id="auth-spinner" class="hidden loading-spinner"></div>
+                    </button>
+                </form>
+                
+                <div class="mt-6 flex flex-col gap-3 text-center">
+                    <button onclick="toggleAuthMode()" id="toggle-text" class="text-[9px] font-black text-gray-400 uppercase tracking-widest block w-full hover:text-black transition-colors">New here? Create account</button>
+                    <button onclick="handleSendAccessCode()" id="reset-trigger-text" class="text-[9px] font-black text-blue-400 uppercase tracking-widest block w-full hover:text-blue-600 transition-colors">Forgot Password? (Get Code)</button>
+                </div>
+            </div>
+
+            <!-- USER VIEW -->
+            <div id="user-view" class="hidden">
+                <h3 class="text-2xl font-black mb-1 truncate" id="profile-email-display">Profile</h3>
+                <p id="profile-status-text" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Standard Access</p>
+                
+                <div id="upgrade-section">
+                    <div class="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                        <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Premium Pass</span>
+                        <div class="text-3xl font-black mt-1">$250.00</div>
+                        <p class="text-[10px] text-gray-400 mt-2 font-bold uppercase">1 Year Full Access</p>
+                    </div>
+
+                    <div class="flex items-start gap-2 mb-4">
+                        <input type="checkbox" id="legal-agree" onchange="togglePayButton()" class="mt-1 accent-black h-4 w-4">
+                        <label for="legal-agree" class="text-[9px] font-bold text-gray-400 uppercase leading-relaxed cursor-pointer select-none">
+                            I agree to the <button onclick="openTerms()" class="text-black underline">Final Sale & Access Policy</button>.
+                        </label>
+                    </div>
+                    
+                    <!-- PayPal Button Container -->
+                    <div id="paypal-container">
+                        <a href="https://www.paypal.com/ncp/payment/Q3WJGWYM45VWA" id="paypal-btn" target="_blank" class="paypal-gold disabled w-full py-4 flex items-center justify-center gap-2 transition-all">
+                            <i class="fab fa-paypal text-lg"></i>
+                            <span class="text-sm">Pay with PayPal</span>
+                        </a>
+                        <p id="pay-hint" class="text-[8px] text-center text-gray-400 mt-2 font-black uppercase tracking-widest">Confirm terms to enable payment</p>
+                    </div>
+                </div>
+
+                <div id="premium-msg" class="hidden text-center py-8 bg-green-50 rounded-3xl border border-green-100">
+                    <i class="fas fa-crown text-green-500 text-2xl mb-2"></i>
+                    <p class="font-bold text-green-700 uppercase text-[10px] tracking-widest">Premium Active</p>
+                </div>
+
+                <button onclick="handleLogout()" class="w-full mt-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms Modal -->
+    <div id="terms-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center modal-overlay p-4">
+        <div class="absolute inset-0 bg-black/5" onclick="closeTerms()"></div>
+        <div class="bg-white w-full max-w-xs rounded-[2rem] shadow-xl relative p-8 border border-gray-100" onclick="event.stopPropagation()">
+            <h4 class="text-sm font-black uppercase tracking-widest mb-4">Purchase Policy</h4>
+            <div class="space-y-4 text-[11px] font-medium text-gray-500 leading-relaxed">
+                <p>• <span class="font-bold text-black">Final Sale:</span> All digital purchases are final. No refunds will be issued once access is granted.</p>
+                <p>• <span class="font-bold text-black">Access Period:</span> Premium access is valid for exactly <span class="font-bold text-black">365 days</span> from the date of purchase.</p>
+                <p>• <span class="font-bold text-black">Personal Use:</span> Access is strictly for one user. Sharing credentials may result in account termination.</p>
+            </div>
+            <button onclick="closeTerms()" class="w-full mt-6 bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">Close</button>
+        </div>
+    </div>
+
+    <!-- Viewer Modal -->
+    <div id="viewer-modal" class="fixed inset-0 z-[150] hidden flex flex-col bg-white">
+        <div class="p-4 border-b flex justify-between items-center bg-white/90 backdrop-blur-sm">
+            <span id="viewer-title" class="text-[10px] font-black uppercase tracking-widest text-gray-400 truncate px-4">Material</span>
+            <button onclick="closeViewer()" class="bg-gray-100 hover:bg-black hover:text-white transition-all px-6 py-2.5 rounded-full text-[10px] font-black uppercase">Close</button>
+        </div>
+        <div class="flex-grow bg-gray-100 relative">
+            <iframe id="pdf-frame" class="w-full h-full border-none" allow="autoplay" title="PDF Viewer"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // -- INITIALIZATION --
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGIT_bZ6nfoJjfipsPygC-BW9LoZeFflI",
+            authDomain: "naomi-sat.firebaseapp.com",
+            projectId: "cmds-36e71",
+            storageBucket: "cmds-36e71.appspot.com",
+            messagingSenderId: "1036067758252", 
+            appId: "1:1036067758252:web:65e12f6a5e1d5a6b7d90c1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const functions = firebase.app().functions('us-central1');
+
+        let isPremium = false;
+        let isSignUp = false;
+        let isResetMode = false;
+        let isVerifiedForReset = false;
+        let unsubscribeUserDoc = null;
+        
+        const storeData = (key, val) => localStorage.setItem(`naomi_persist_${key}`, val);
+        const getData = (key) => localStorage.getItem(`naomi_persist_${key}`);
+        const clearStorage = () => {
+            localStorage.removeItem('naomi_persist_email');
+            localStorage.removeItem('naomi_persist_code');
+            localStorage.removeItem('naomi_persist_reset_active');
+        };
+
+        const materials = [
+            { title: "Test 1", url: "https://drive.google.com/file/d/1NF4G5V05IAHAgKT7iDth2TzHwsaXVYuA/view?usp=drivesdk", free: true },
+            { title: "Solutions 1", url: "https://drive.google.com/file/d/1ivSyFwhkDqOwd5lWVcAySnHKq5cfi9cB/view?usp=drivesdk", free: true },
+            { title: "Test 2", url: "https://drive.google.com/file/d/1vCxb3IBAOvnIjcgnY21BNmBw0P4DE-ji/view?usp=drivesdk", free: false },
+            { title: "Solutions 2", url: "https://drive.google.com/file/d/19Vtn9xF42xuCcf8NUOyu3u4tdSfWjvfV/view?usp=drivesdk", free: false },
+            { title: "Test 3", url: "https://drive.google.com/file/d/1F5Vy5D8uLI5krrpmvfUv-bd-tmfoOuZt/view?usp=drivesdk", free: false },
+            { title: "Solutions 3", url: "https://drive.google.com/file/d/1bAGoCxGGM0xoT0Qjh-PK_lqK8ACByRZs/view?usp=sharing", free: false },
+            { title: "Test 4", url: "https://drive.google.com/file/d/1DwvqaFvb2TAvsC2IXjeQwLapvzal5oF7/view?usp=drivesdk", free: false },
+            { title: "Solutions 4", url: "https://drive.google.com/file/d/1kzfAwcMCabic1wAv2vGgVMC5DFNuo-Oj/view?usp=drivesdk", free: false },
+            { title: "Test 5", url: "https://drive.google.com/file/d/1h9HhApxilRScr_azmtrws0lqkrE65gLa/view?usp=drivesdk", free: false },
+            { title: "Solutions 5", url: "https://drive.google.com/file/d/1ibnhezNlJzBCcUlYeaZRsUuqC2ybfIXA/view?usp=drivesdk", free: false },
+            { title: "Test 6", url: "https://drive.google.com/file/d/1oDwiF868KsUkp4lUJxiXORuA97QkWIWL/view?usp=drivesdk", free: false },
+            { title: "Solutions 6", url: "https://drive.google.com/file/d/137vLnnqhuWCYpvpvhKc0-Kjj2QIdQxO3/view?usp=drivesdk", free: false },
+            { title: "Test 7", url: "https://drive.google.com/file/d/1oDwiF868KsUkp4lUJxiXORuA97QkWIWL/view?usp=drivesdk", free: false },
+            { title: "Solutions 7", url: "https://drive.google.com/file/d/1oLZYUt-43fLiTaAlA-42VOgJv1fgymDc/view?usp=drivesdk", free: false },
+            { title: "Test 8", url: "https://drive.google.com/file/d/1-iMyUwmXKaG5IGILrzemhlBp9kVDclgN/view?usp=drivesdk", free: false },
+            { title: "Solutions 8", url: "https://drive.google.com/file/d/12IajQ6FWXQa3SHKERNrElYWLkN1CPlB7/view?usp=drivesdk", free: false },
+            { title: "Test 9", url: "https://drive.google.com/file/d/1_i8x_ltHGkFbKURkBXvsQkypGGrYOeS-/view?usp=drivesdk", free: false },
+            { title: "Solutions 9", url: "https://drive.google.com/file/d/1fj3Hb6N6Dhx41BsEK2wUORvj6DRjzfP7/view?usp=drivesdk", free: false },
+            { title: "Test 10", url: "https://drive.google.com/file/d/1QIqtnxG0lyREeKZLOrFE1UTxQHFvH9Jw/view?usp=drivesdk", free: false },
+            { title: "Solutions 10", url: "https://drive.google.com/file/d/1SVCkbSbII_Vwew4CZL-DgmLnz4i_j23W/view?usp=drivesdk", free: false }
+        ];
+
+        window.onload = () => {
+            if (getData('reset_active') === 'true') {
+                isResetMode = true;
+                openAuthModal(false);
+                const email = getData('email');
+                if (email) {
+                    document.getElementById('email').value = email;
+                    document.getElementById('reset-email-confirm').innerText = `Verifying for: ${email}`;
+                }
+                updateAuthMode();
+            }
+        };
+
+        auth.onAuthStateChanged(user => {
+            if (unsubscribeUserDoc) unsubscribeUserDoc();
+            if (user) {
+                unsubscribeUserDoc = db.collection('users').doc(user.uid).onSnapshot(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        isPremium = !!data.isPremium;
+                    } else {
+                        db.collection('users').doc(user.uid).set({ email: user.email, isPremium: false }, { merge: true });
+                        isPremium = false;
+                    }
+                    updateUIState(user);
+                }, (err) => {
+                    console.error("Firestore error:", err);
+                    updateUIState(user);
+                });
+            } else {
+                isPremium = false;
+                updateUIState(null);
+            }
+        });
+
+        function updateUIState(user) {
+            const guestControls = document.getElementById('guest-controls');
+            const userControls = document.getElementById('user-controls');
+            const guestView = document.getElementById('guest-view');
+            const userView = document.getElementById('user-view');
+
+            if (user) {
+                guestControls.classList.add('hidden');
+                userControls.classList.remove('hidden');
+                if (!document.getElementById('auth-modal').classList.contains('hidden')) {
+                    guestView.classList.add('hidden');
+                    userView.classList.remove('hidden');
+                }
+                document.getElementById('nav-user-email').innerText = user.email;
+                document.getElementById('nav-user-status').innerText = isPremium ? "Premium" : "Standard";
+                document.getElementById('profile-email-display').innerText = user.email;
+                document.getElementById('profile-status-text').innerText = isPremium ? "Premium Member" : "Standard Access";
+                document.getElementById('upgrade-section').classList.toggle('hidden', isPremium);
+                document.getElementById('premium-msg').classList.toggle('hidden', !isPremium);
+            } else {
+                guestControls.classList.remove('hidden');
+                userControls.classList.add('hidden');
+                guestView.classList.remove('hidden');
+                userView.classList.add('hidden');
+            }
+            renderGrid();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('main-grid');
+            grid.innerHTML = '';
+            materials.forEach(item => {
+                const locked = !item.free && !isPremium;
+                const card = document.createElement('div');
+                card.className = `content-card ${locked ? 'card-locked' : 'card-free cursor-pointer'}`;
+                
+                card.onclick = () => {
+                    if (locked) {
+                        openAuthModal(false);
+                    } else {
+                        openViewer(formatDriveUrl(item.url), item.title);
+                    }
+                };
+
+                card.innerHTML = `${locked ? '<i class="fas fa-lock absolute left-5 text-gray-200 text-[10px]"></i>' : ''}<span class="font-bold text-[14px]">${item.title}</span>`;
+                grid.appendChild(card);
+            });
+        }
+
+        async function handleSendAccessCode() {
+            const emailInput = document.getElementById('email').value.trim().toLowerCase();
+            if (!emailInput || !emailInput.includes('@')) { showError("Enter a valid email."); return; }
+            storeData('email', emailInput);
+            storeData('reset_active', 'true');
+            toggleLoading(true);
+            hideError();
+            try {
+                const sendCodeFn = functions.httpsCallable('sendVerificationCode');
+                const deviceId = getDeviceId();
+                const result = await sendCodeFn({ email: String(emailInput), deviceId: String(deviceId) });
+                if (result?.data?.success) {
+                    isResetMode = true;
+                    isVerifiedForReset = false;
+                    document.getElementById('reset-email-confirm').innerText = `Verifying for: ${emailInput}`;
+                    updateAuthMode(); 
+                    showStatus("Code sent! Check your inbox.", "blue");
+                } else {
+                    throw new Error(result?.data?.error || "Failed to send code.");
+                }
+            } catch (err) {
+                console.error("Code send failure:", err);
+                showError("User not found or error sending code.");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function handleVerifyCodeOnly() {
+            const codeInput = document.getElementById('verification-code').value.trim();
+            const email = getData('email');
+            const deviceId = getDeviceId();
+            if (!codeInput || codeInput.length < 6) { showError("Enter 6-digit code."); return; }
+            if (!email) { showError("Session expired. Restart."); resetAuthState(); return; }
+            toggleLoading(true);
+            hideError();
+            try {
+                const verifyFn = functions.httpsCallable('verifyCodeAndLogin');
+                const result = await verifyFn({ email: String(email).trim().toLowerCase(), code: String(codeInput).trim(), deviceId: String(deviceId) });
+                const isValid = result?.data === true || result?.data?.success === true || result?.data?.valid === true || result?.data?.token;
+                if (isValid) {
+                    storeData('code', String(codeInput).trim());
+                    isVerifiedForReset = true;
+                    updateAuthMode();
+                    showStatus("Verified! Now set your new password.", "green");
+                } else {
+                    throw new Error(result?.data?.error || "Invalid code");
+                }
+            } catch (error) {
+                console.error("Verification error:", error);
+                showError("Invalid or expired code.");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function handleUpdatePassword() {
+            const newPass = document.getElementById('new-pass').value;
+            const newPassConfirm = document.getElementById('new-pass-confirm').value;
+            const email = getData('email');
+            const code = getData('code');
+            const deviceId = getDeviceId();
+            if (!email || !code) { showError("Session lost. Restart."); resetAuthState(); return; }
+            if (!newPass || newPass.length < 6) { showError("Password min 6 characters."); return; }
+            if (newPass !== newPassConfirm) { showError("Passwords don't match."); return; }
+            toggleLoading(true);
+            hideError();
+            try {
+                const resetFn = functions.httpsCallable('resetPasswordWithCode');
+                const result = await resetFn({ email: String(email).trim().toLowerCase(), code: String(code).trim(), newPassword: String(newPass), deviceId: String(deviceId) });
+                if (result?.data?.token) {
+                    await auth.signInWithCustomToken(result.data.token);
+                    clearStorage();
+                    showStatus("Success! Logging you in...", "green");
+                    setTimeout(() => closeAuthModal(), 1500);
+                } else {
+                    throw new Error(result?.data?.error || "Reset failed.");
+                }
+            } catch (err) {
+                console.error("Update pass error:", err);
+                showError("Failed to update password. Code may be expired.");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        document.getElementById('auth-form').onsubmit = async (e) => {
+            e.preventDefault();
+            if (isResetMode) {
+                if (!isVerifiedForReset) await handleVerifyCodeOnly();
+                else await handleUpdatePassword();
+                return;
+            }
+            const emailInput = document.getElementById('email').value.trim().toLowerCase();
+            const pass = document.getElementById('pass').value;
+            toggleLoading(true);
+            hideError();
+            try {
+                if (isSignUp) {
+                    const passConfirm = document.getElementById('pass-confirm').value;
+                    if (pass !== passConfirm) { showError("Passwords don't match."); toggleLoading(false); return; }
+                    const res = await auth.createUserWithEmailAndPassword(emailInput, pass);
+                    await db.collection('users').doc(res.user.uid).set({ email: emailInput, isPremium: false }, { merge: true });
+                } else {
+                    await auth.signInWithEmailAndPassword(emailInput, pass);
+                    closeAuthModal();
+                }
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                toggleLoading(false);
+            }
+        };
+
+        function updateAuthMode() {
+            const passWrap = document.getElementById('password-wrapper');
+            const verifyWrap = document.getElementById('verification-wrapper');
+            const newPassWrap = document.getElementById('new-password-wrapper');
+            const signupExtra = document.getElementById('signup-extra');
+            const resetTrigger = document.getElementById('reset-trigger-text');
+            const toggleText = document.getElementById('toggle-text');
+            const emailWrap = document.getElementById('email-wrapper');
+            const guestView = document.getElementById('guest-view');
+            const userView = document.getElementById('user-view');
+            const currentUser = auth.currentUser;
+
+            if (currentUser) {
+                guestView.classList.add('hidden');
+                userView.classList.remove('hidden');
+                return;
+            }
+
+            guestView.classList.remove('hidden');
+            userView.classList.add('hidden');
+
+            if (isResetMode) {
+                document.getElementById('auth-title').innerText = isVerifiedForReset ? "New Password" : "Verification";
+                document.getElementById('auth-subtitle').innerText = isVerifiedForReset ? "Set your new security key" : "Check your email for the code";
+                emailWrap.classList.add('hidden');
+            } else {
+                document.getElementById('auth-title').innerText = isSignUp ? "Join Naomi SAT" : "Member Login";
+                document.getElementById('auth-subtitle').innerText = isSignUp ? "Create your learning profile" : "Welcome back to your portal";
+                emailWrap.classList.remove('hidden');
+            }
+
+            verifyWrap.classList.toggle('hidden', !isResetMode || isVerifiedForReset);
+            newPassWrap.classList.toggle('hidden', !isVerifiedForReset);
+            passWrap.classList.toggle('hidden', isResetMode);
+            signupExtra.classList.toggle('hidden', !isSignUp || isResetMode);
+            resetTrigger.classList.toggle('hidden', isResetMode);
+            toggleText.innerText = isResetMode ? "Cancel and Login" : (isSignUp ? "Already a member? Sign in" : "New here? Join now");
+            document.getElementById('auth-btn-text').innerText = isResetMode ? (isVerifiedForReset ? "Save Password" : "Verify Code") : "Continue";
+            if (!isResetMode) hideError();
+        }
+
+        function toggleAuthMode() { 
+            if (isResetMode) { resetAuthState(); }
+            else { isSignUp = !isSignUp; }
+            updateAuthMode(); 
+        }
+
+        function openAuthModal(signup = false) {
+            isSignUp = signup;
+            if (getData('reset_active') !== 'true') {
+                isResetMode = false;
+                isVerifiedForReset = false;
+            }
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            updateAuthMode();
+        }
+
+        function closeAuthModal() { 
+            document.getElementById('auth-modal').classList.add('hidden'); 
+            document.body.style.overflow = 'auto';
+            document.getElementById('auth-form').reset();
+            hideError();
+        }
+
+        function openTerms() { document.getElementById('terms-modal').classList.remove('hidden'); }
+        function closeTerms() { document.getElementById('terms-modal').classList.add('hidden'); }
+
+        function togglePayButton() {
+            const agreed = document.getElementById('legal-agree').checked;
+            document.getElementById('paypal-btn').classList.toggle('disabled', !agreed);
+            document.getElementById('pay-hint').classList.toggle('hidden', agreed);
+        }
+
+        function resetAuthState() {
+            isResetMode = false; isVerifiedForReset = false; 
+            clearStorage();
+            updateAuthMode();
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('auth-error');
+            el.innerText = msg;
+            el.className = 'text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest text-red-500 border-red-100 bg-red-50 mb-4';
+            el.classList.remove('hidden');
+        }
+
+        function hideError() { document.getElementById('auth-error').classList.add('hidden'); }
+
+        function showStatus(msg, color) {
+            const el = document.getElementById('auth-error');
+            el.innerText = msg;
+            el.className = `text-[10px] font-bold p-3 rounded-xl text-center border uppercase tracking-widest text-${color}-500 border-${color}-100 bg-${color}-50 mb-4`;
+            el.classList.remove('hidden');
+        }
+
+        function toggleLoading(active) {
+            const btn = document.getElementById('auth-submit-btn');
+            btn.disabled = active;
+            const spinner = document.getElementById('auth-spinner');
+            if (spinner) spinner.classList.toggle('hidden', !active);
+        }
+
+        async function handleLogout() { 
+            await auth.signOut(); 
+            closeAuthModal(); 
+            location.reload();
+        }
+
+        function formatDriveUrl(url) { 
+            if (!url) return '';
+            return url.includes('/view') ? url.replace(/\/view.*$/, '/preview') : url; 
+        }
+
+        function getDeviceId() {
+            let id = localStorage.getItem('naomi_persist_device_id');
+            if (!id) { id = 'nd_' + Math.random().toString(36).substr(2, 12); localStorage.setItem('naomi_persist_device_id', id); }
+            return id;
+        }
+
+        function openViewer(url, title) {
+            document.getElementById('viewer-title').innerText = title;
+            document.getElementById('pdf-frame').src = url;
+            document.getElementById('viewer-modal').classList.remove('hidden');
+        }
+
+        function closeViewer() { 
+            document.getElementById('viewer-modal').classList.add('hidden'); 
+            document.getElementById('pdf-frame').src = "about:blank"; 
+        }
+    </script>
+</body>
+</html>
