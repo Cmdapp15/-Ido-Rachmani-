@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Naomi's English SAT Course</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+    
+    <!-- UI & Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            overflow-x: hidden !important;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.modal-open {
+            overflow: hidden !important;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            padding: 10px clamp(8px, 3vw, 16px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .nav-brand-text {
+            font-size: clamp(8px, 2.2vw, 10px);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .nav-btn {
+            padding: 5px clamp(6px, 2vw, 12px);
+            border-radius: 999px;
+            font-size: clamp(8px, 1.8vw, 9px);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+
+        .hero-section {
+            padding-top: 100px;
+            padding-bottom: 30px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .hero-title {
+            font-size: clamp(1.8rem, 9vw, 3.5rem);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .material-grid {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 10px;
+            width: 100%;
+        }
+
+        .material-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .material-card {
+            background: #ffffff;
+            border: 1.5px solid #f2f2f2;
+            border-radius: 12px;
+            height: clamp(52px, 14vw, 68px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0 clamp(4px, 1.5vw, 10px);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .material-card:active { transform: scale(0.96); }
+
+        .material-card span {
+            font-weight: 700;
+            font-size: clamp(9px, 2.6vw, 12px);
+            line-height: 1.1;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .material-card.locked { opacity: 0.6; background: #f9f9f9; }
+        .material-card.locked i.fa-lock { font-size: clamp(8px, 2vw, 10px); color: #ccc; margin-bottom: 4px; }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center; 
+            justify-content: center;
+            padding: 20px 10px;
+        }
+
+        .compact-modal {
+            background: white;
+            width: 100%;
+            max-width: 380px;
+            border-radius: 28px;
+            padding: 32px 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+        }
+
+        /* Improved Input UI */
+        .input-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px;
+            background-color: #f9fafb;
+            border: 2px solid transparent;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .password-style {
+            background-color: rgba(240, 253, 244, 0.6) !important; /* light green tint */
+        }
+
+        /* Dynamic States */
+        .valid-field {
+            border-color: #22c55e !important;
+            background-color: #f0fdf4 !important;
+        }
+
+        .invalid-field {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2 !important;
+        }
+
+        .toggle-icon {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        #auth-submit-btn:disabled {
+            background-color: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .status-msg {
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            margin-top: 8px;
+            min-height: 15px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="flex items-center gap-2">
+            <div class="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-[10px] font-black">N</div>
+            <span class="nav-brand-text">NAOMI ENGLISH SAT</span>
+        </div>
+        <div id="nav-actions">
+            <div id="logged-out-nav" class="flex gap-1.5">
+                <button onclick="openAuth(false)" class="nav-btn border border-black text-black">Login</button>
+                <button onclick="openAuth(true)" class="nav-btn bg-black text-white">Sign Up</button>
+            </div>
+            <div id="logged-in-nav" class="hidden flex items-center gap-2">
+                <div class="flex flex-col items-end">
+                    <span id="user-display" class="text-[8px] font-black uppercase text-black truncate max-w-[60px]"></span>
+                    <div id="user-status"></div>
+                </div>
+                <button onclick="logout()" class="text-gray-300 hover:text-black p-1.5"><i class="fas fa-sign-out-alt text-xs"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <h1 class="hero-title">Naomi's English SAT</h1>
+        <p id="upgrade-banner" class="text-[11px] font-semibold text-gray-500 mb-6">
+            Test 1 & Solution 1 are free — 
+            <span class="text-black font-black underline cursor-pointer" onclick="handleUpgradeClick()">Get Full Access</span> for $0.50/year
+        </p>
+
+        <div id="materials-list" class="material-grid"></div>
+    </section>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal-overlay hidden">
+        <div class="compact-modal">
+            <button onclick="closeAuth()" class="absolute top-6 right-6 text-gray-300 hover:text-black"><i class="fas fa-times"></i></button>
+            <h3 id="modal-title" class="text-xl font-black mb-1">Access</h3>
+            <p id="modal-subtitle" class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-8">Secure Gateway</p>
+            
+            <form id="auth-form" class="space-y-4">
+                <div id="base-fields" class="space-y-3">
+                    <!-- Email field -->
+                    <div class="input-wrapper">
+                        <input type="email" id="email" placeholder="Email Address" class="form-input" required oninput="validateEmailUI(this)">
+                    </div>
+
+                    <!-- Main password field -->
+                    <div id="password-group" class="space-y-3">
+                        <div class="input-wrapper">
+                            <input type="password" id="pass" placeholder="Password" class="form-input password-style" oninput="validatePasswordUI()">
+                            <i class="fas fa-eye toggle-icon" onclick="togglePass('pass')"></i>
+                        </div>
+                        <div id="forgot-password-link" class="flex justify-end">
+                            <span onclick="triggerResetFlow()" class="text-[8px] font-black text-gray-400 uppercase tracking-widest hover:text-black cursor-pointer">Forgot Password?</span>
+                        </div>
+                    </div>
+
+                    <!-- Confirmation fields for Signup -->
+                    <div id="signup-fields" class="hidden">
+                        <div class="input-wrapper">
+                            <input type="password" id="pass-confirm" placeholder="Confirm Password" class="form-input password-style" oninput="validatePasswordUI()">
+                            <i class="fas fa-eye toggle-icon" onclick="togglePass('pass-confirm')"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OTP / Reset logic (keeping your structure) -->
+                <div id="otp-fields" class="hidden">
+                    <p class="text-[9px] font-black text-gray-400 uppercase mb-2 text-center">Enter verification code</p>
+                    <input type="text" id="otp-code" maxlength="6" placeholder="000000" class="form-input otp-input">
+                </div>
+
+                <div id="new-password-fields" class="hidden space-y-3">
+                    <div class="input-wrapper">
+                        <input type="password" id="new-pass" placeholder="New Password" class="form-input password-style" oninput="validatePasswordUI()">
+                        <i class="fas fa-eye toggle-icon" onclick="togglePass('new-pass')"></i>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="password" id="new-pass-confirm" placeholder="Confirm New Password" class="form-input password-style" oninput="validatePasswordUI()">
+                        <i class="fas fa-eye toggle-icon" onclick="togglePass('new-pass-confirm')"></i>
+                    </div>
+                </div>
+
+                <div id="error-msg" class="status-msg hidden"></div>
+                
+                <button type="submit" id="auth-submit-btn" class="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest mt-4 flex items-center justify-center transition-all">
+                    <span id="auth-spinner" class="hidden mr-2"><i class="fas fa-circle-notch fa-spin"></i></span>
+                    <span id="submit-text">Continue</span>
+                </button>
+            </form>
+            
+            <button onclick="toggleAuthMode()" id="toggle-btn" class="w-full mt-6 text-[9px] font-black text-gray-300 uppercase tracking-widest hover:text-black">New User? Sign Up</button>
+            <button onclick="resetToInitialState()" id="back-btn" class="hidden w-full mt-6 text-[9px] font-black text-gray-300 uppercase tracking-widest hover:text-black">Back to Login</button>
+        </div>
+    </div>
+
+    <!-- Other Modals (Upgrade, Terms, Viewer) - Content remains the same but ensure ID matches -->
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="compact-modal text-center">
+            <button onclick="closeUpgradeModal()" class="absolute top-6 right-6 text-gray-300 hover:text-black"><i class="fas fa-times"></i></button>
+            <div class="w-12 h-12 bg-black text-white rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg"><i class="fas fa-crown text-xl"></i></div>
+            <h3 class="text-xl font-black">Premium Access</h3>
+            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-6">Unlock All Materials</p>
+            <div class="bg-gray-50 p-6 rounded-3xl mb-6">
+                <div class="text-3xl font-black">$0.50</div>
+                <div class="text-[8px] font-bold text-gray-400">One-year full access</div>
+            </div>
+            <label class="flex items-start gap-3 cursor-pointer text-left mb-6 px-1">
+                <input type="checkbox" id="terms-check" onchange="togglePayButton()" class="mt-1 h-4 w-4 rounded accent-black cursor-pointer">
+                <span class="text-[10px] font-bold text-gray-500 leading-tight">I agree to the <span onclick="toggleTermsModal()" class="text-black underline cursor-pointer">Terms & No-Refund Policy</span>.</span>
+            </label>
+            <div id="payment-area" class="hidden"><div id="paypal-button-container"></div></div>
+            <p id="checkbox-hint" class="text-[9px] font-black text-red-500 uppercase">Check the box above to pay</p>
+        </div>
+    </div>
+
+    <div id="terms-modal" class="modal-overlay hidden" style="z-index: 400;">
+        <div class="compact-modal">
+            <button onclick="toggleTermsModal()" class="absolute top-6 right-6 text-gray-300 hover:text-black"><i class="fas fa-times"></i></button>
+            <h3 class="text-xl font-black mb-4">Terms & Policy</h3>
+            <div class="text-left text-[11px] text-gray-600 leading-relaxed font-semibold">
+                <p class="mb-2 font-black">1. Digital Access</p><p class="mb-4">Valid for 365 days.</p>
+                <p class="mb-2 font-black">2. No-Refund Policy</p><p class="mb-4 text-red-600 font-black">All sales are final.</p>
+            </div>
+            <button onclick="toggleTermsModal()" class="mt-6 w-full bg-black text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest">Close</button>
+        </div>
+    </div>
+
+    <div id="viewer" class="fixed inset-0 z-[300] hidden bg-white flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center bg-white">
+            <span id="viewer-name" class="text-[9px] font-black uppercase text-gray-400 truncate max-w-[50%]"></span>
+            <button onclick="closeViewer()" class="bg-black text-white px-6 py-2 rounded-full text-[9px] font-black uppercase">Close</button>
+        </div>
+        <iframe id="pdf-frame" class="flex-1 w-full border-none bg-gray-50"></iframe>
+    </div>
+
+    <script>
+        // --- UX Validations ---
+        function validateEmailUI(input) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const isValid = re.test(input.value);
+            if (input.value.length === 0) {
+                input.classList.remove('valid-field', 'invalid-field');
+            } else if (isValid) {
+                input.classList.add('valid-field');
+                input.classList.remove('invalid-field');
+            } else {
+                input.classList.add('invalid-field');
+                input.classList.remove('valid-field');
+            }
+            checkFormValidity();
+        }
+
+        function validatePasswordUI() {
+            const p1 = document.getElementById(isResetMode ? 'new-pass' : 'pass');
+            const p2 = document.getElementById(isResetMode ? 'new-pass-confirm' : 'pass-confirm');
+            
+            // Primary field
+            if (p1.value.length >= 6) {
+                p1.classList.add('valid-field');
+                p1.classList.remove('invalid-field');
+            } else if (p1.value.length > 0) {
+                p1.classList.add('invalid-field');
+                p1.classList.remove('valid-field');
+            }
+
+            // Secondary (Confirm) field
+            if (isSignUp || isResetMode) {
+                if (p2.value.length > 0) {
+                    if (p1.value === p2.value) {
+                        p2.classList.add('valid-field');
+                        p2.classList.remove('invalid-field');
+                    } else {
+                        p2.classList.add('invalid-field');
+                        p2.classList.remove('valid-field');
+                    }
+                }
+            }
+            checkFormValidity();
+        }
+
+        function checkFormValidity() {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById(isResetMode ? 'new-pass' : 'pass').value;
+            const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            
+            let passValid = pass.length >= 6;
+            if (isSignUp || (isResetMode && isVerifiedForReset)) {
+                const passConfirm = document.getElementById(isResetMode ? 'new-pass-confirm' : 'pass-confirm').value;
+                passValid = passValid && (pass === passConfirm);
+            }
+
+            document.getElementById('auth-submit-btn').disabled = !(emailValid && passValid);
+        }
+
+        function togglePass(id) {
+            const input = document.getElementById(id);
+            const icon = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // --- Firebase Core ---
+        function getDeviceId() {
+            let id = localStorage.getItem('naomi_device_id');
+            if (!id) { id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36); localStorage.setItem('naomi_device_id', id); }
+            return id;
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGIT_bZ6nfoJjfipsPygC-BW9LoZeFflI",
+            authDomain: "naomi-sat.firebaseapp.com",
+            projectId: "cmds-36e71",
+            storageBucket: "cmds-36e71.appspot.com",
+            messagingSenderId: "1036067758252", 
+            appId: "1:1036067758252:web:65e12f6a5e1d5a6b7d90c1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const functions = firebase.functions();
+
+        let isPremium = false;
+        let currentUser = null;
+        let materialsData = [];
+        let isSignUp = false;
+        let isResetMode = false;
+        let isVerifiedForReset = false;
+        let paypalRendered = false;
+
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            if (user) {
+                db.collection('users').doc(user.uid).onSnapshot(doc => {
+                    isPremium = doc.exists ? !!doc.data().isPremium : false;
+                    renderMaterials();
+                    updateNav(user, isPremium);
+                    document.getElementById('upgrade-banner').classList.toggle('hidden', isPremium);
+                }, () => {}); // Ignore snap errors for smoothness
+            } else {
+                isPremium = false; renderMaterials(); updateNav(null);
+            }
+        });
+
+        // --- Logic & Actions ---
+        async function fetchMaterials() {
+            const snap = await db.collection('materials').orderBy('id', 'asc').get();
+            materialsData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderMaterials();
+        }
+
+        function renderMaterials() {
+            const list = document.getElementById('materials-list');
+            if (materialsData.length === 0) { fetchMaterials(); return; }
+            list.innerHTML = '';
+            for (let i = 0; i < materialsData.length; i += 2) {
+                const row = document.createElement('div');
+                row.className = 'material-row';
+                const m1 = materialsData[i]; const m2 = materialsData[i+1];
+                const l1 = !m1.free && !isPremium; const l2 = m2 ? (!m2.free && !isPremium) : false;
+                row.innerHTML = `
+                    <div class="material-card ${l1 ? 'locked' : ''}" onclick="handleOpen('${m1.url}', '${m1.title}', ${l1})">${l1 ? '<i class="fas fa-lock"></i>' : ''}<span>${m1.title}</span></div>
+                    ${m2 ? `<div class="material-card ${l2 ? 'locked' : ''}" onclick="handleOpen('${m2.url}', '${m2.title}', ${l2})">${l2 ? '<i class="fas fa-lock"></i>' : ''}<span>${m2.title}</span></div>` : ''}
+                `;
+                list.appendChild(row);
+            }
+        }
+
+        function handleOpen(url, title, locked) {
+            if (locked) handleUpgradeClick();
+            else {
+                document.getElementById('viewer-name').innerText = title;
+                document.getElementById('pdf-frame').src = url.includes('/view') ? url.replace(/\/view.*$/, '/preview') : url;
+                document.getElementById('viewer').classList.remove('hidden');
+                document.body.classList.add('modal-open');
+            }
+        }
+
+        function handleUpgradeClick() {
+            if (!currentUser) { openAuth(false); return; }
+            document.getElementById('profile-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+            if (!paypalRendered) initPayPal();
+        }
+
+        async function initPayPal() {
+            const script = document.createElement('script');
+            script.src = "https://www.paypal.com/sdk/js?client-id=AQy8XrJ5wDeyWAFb0RmKb_fMOqehJM6-Wqp1diESS1VsH5031z4oge_OikyR8Nc4Igo_RSJl-rFpZo96&currency=USD&locale=en_US";
+            script.onload = () => {
+                paypal.Buttons({
+                    style: { layout: 'vertical', color: 'black', shape: 'pill', label: 'pay' },
+                    createOrder: (data, actions) => actions.order.create({ purchase_units: [{ custom_id: currentUser.uid, amount: { value: '0.50' } }] }),
+                    onApprove: (data, actions) => actions.order.capture().then(() => closeUpgradeModal())
+                }).render('#paypal-button-container');
+                paypalRendered = true;
+            };
+            document.head.appendChild(script);
+        }
+
+        // --- Auth Handlers ---
+        function openAuth(signup) { 
+            isSignUp = signup; isResetMode = false; updateAuthUI(); 
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+        
+        function closeAuth() { 
+            document.getElementById('auth-modal').classList.add('hidden'); 
+            document.body.classList.remove('modal-open');
+            document.getElementById('error-msg').classList.add('hidden');
+            // Clear inputs and classes
+            document.querySelectorAll('.form-input').forEach(i => { i.value = ''; i.classList.remove('valid-field', 'invalid-field'); });
+        }
+
+        function toggleAuthMode() { isSignUp = !isSignUp; updateAuthUI(); }
+        
+        function updateAuthUI() {
+            document.getElementById('signup-fields').classList.toggle('hidden', !isSignUp || isResetMode);
+            document.getElementById('forgot-password-link').classList.toggle('hidden', isSignUp || isResetMode);
+            document.getElementById('otp-fields').classList.toggle('hidden', !isResetMode || isVerifiedForReset);
+            document.getElementById('new-password-fields').classList.toggle('hidden', !isVerifiedForReset);
+            document.getElementById('base-fields').classList.toggle('hidden', isResetMode && !isVerifiedForReset);
+            document.getElementById('toggle-btn').classList.toggle('hidden', isResetMode);
+            document.getElementById('back-btn').classList.toggle('hidden', !isResetMode);
+            document.getElementById('password-group').classList.toggle('hidden', isResetMode);
+            document.getElementById('modal-title').innerText = isResetMode ? "Security" : (isSignUp ? "Join Us" : "Login");
+            document.getElementById('submit-text').innerText = isResetMode ? (isVerifiedForReset ? "Update" : "Verify") : "Continue";
+            checkFormValidity();
+        }
+
+        document.getElementById('auth-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            setLoading(true);
+            try {
+                if (!isResetMode) {
+                    const pass = document.getElementById('pass').value;
+                    if (isSignUp) {
+                        const confirm = document.getElementById('pass-confirm').value;
+                        if (pass !== confirm) throw new Error("Passwords do not match");
+                        
+                        // 1. Create User
+                        const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                        
+                        // 2. Try to create Firestore record silently
+                        try {
+                            await db.collection('users').doc(cred.user.uid).set({ email, isPremium: false }, { merge: true });
+                        } catch (fErr) {
+                            console.warn("Firestore init failed (permission delay), but Auth is OK.");
+                        }
+                        
+                        showStatus("Welcome! Account created.", false);
+                    } else { 
+                        await auth.signInWithEmailAndPassword(email, pass);
+                        showStatus("Login Successful!", false);
+                    }
+                    setTimeout(closeAuth, 1200);
+                } else {
+                    // Reset Logic... (omitted for brevity, keep as is)
+                    if (!isVerifiedForReset) {
+                        const code = document.getElementById('otp-code').value;
+                        const res = await functions.httpsCallable('verifyCodeAndLogin')({ email, code, deviceId: getDeviceId() });
+                        if (res.data.success) { isVerifiedForReset = true; updateAuthUI(); }
+                    } else {
+                        const n1 = document.getElementById('new-pass').value;
+                        const code = document.getElementById('otp-code').value;
+                        const res = await functions.httpsCallable('resetPasswordWithCode')({ email, code, newPassword: n1, deviceId: getDeviceId() });
+                        if (res.data.token) { 
+                            await auth.signInWithCustomToken(res.data.token); 
+                            showStatus("Password Reset Success!", false);
+                            setTimeout(closeAuth, 1200);
+                        } else { showStatus("Update complete. Please login.", false); resetToInitialState(); }
+                    }
+                }
+            } catch (err) { 
+                showStatus(err.message, true); 
+            } finally { setLoading(false); }
+        };
+
+        function showStatus(m, e) {
+            const el = document.getElementById('error-msg');
+            el.innerText = m;
+            el.className = `status-msg ${e ? 'text-red-500' : 'text-green-500'}`;
+            el.classList.remove('hidden');
+        }
+
+        function setLoading(l) {
+            document.getElementById('auth-spinner').classList.toggle('hidden', !l);
+            document.getElementById('auth-submit-btn').disabled = l;
+        }
+
+        // --- UI Utils ---
+        function togglePayButton() { document.getElementById('payment-area').classList.toggle('hidden', !document.getElementById('terms-check').checked); document.getElementById('checkbox-hint').classList.toggle('hidden', document.getElementById('terms-check').checked); }
+        function toggleTermsModal() { document.getElementById('terms-modal').classList.toggle('hidden'); }
+        function closeUpgradeModal() { document.getElementById('profile-modal').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+        function resetToInitialState() { isResetMode = false; isVerifiedForReset = false; updateAuthUI(); }
+        function logout() { auth.signOut(); }
+        function closeViewer() { document.getElementById('viewer').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+        function updateNav(u, p) {
+            document.getElementById('logged-out-nav').classList.toggle('hidden', !!u);
+            document.getElementById('logged-in-nav').classList.toggle('hidden', !u);
+            if (u) {
+                document.getElementById('user-display').innerText = u.email.split('@')[0];
+                document.getElementById('user-status').innerHTML = p ? '<span class="text-[7px] font-black bg-black text-white px-1.5 rounded uppercase">Premium</span>' : '<span class="text-[7px] font-black bg-gray-100 text-gray-400 px-1.5 rounded uppercase">Standard</span>';
+            }
+        }
+    </script>
+</body>
+</html>
