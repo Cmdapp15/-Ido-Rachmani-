@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Naomi's English SAT Course</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- UI & Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            overflow-x: hidden !important;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.modal-open { overflow: hidden !important; }
+
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            padding: 10px clamp(8px, 3vw, 16px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .nav-brand-text {
+            font-size: clamp(8px, 2.2vw, 10px);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nav-btn {
+            padding: 5px clamp(6px, 2vw, 12px);
+            border-radius: 999px;
+            font-size: clamp(8px, 1.8vw, 9px);
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .hero-section {
+            padding-top: 100px;
+            padding-bottom: 30px;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-size: clamp(1.8rem, 9vw, 3.5rem);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .material-grid {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        .material-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .material-card {
+            background: #ffffff;
+            border: 1.5px solid #f2f2f2;
+            border-radius: 12px;
+            height: clamp(52px, 14vw, 68px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .material-card span {
+            font-weight: 700;
+            font-size: clamp(9px, 2.6vw, 12px);
+        }
+
+        .material-card.locked { opacity: 0.6; background: #f9f9f9; }
+        .material-card.locked i.fa-lock { font-size: clamp(8px, 2vw, 10px); color: #ccc; margin-bottom: 4px; }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center; 
+            justify-content: center;
+            padding: 20px 10px;
+        }
+
+        .compact-modal {
+            background: white;
+            width: 100%;
+            max-width: 380px;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* INPUTS STYLE */
+        .field-input {
+            width: 100%;
+            padding: 16px;
+            background: rgba(240, 253, 244, 0.6); 
+            border-radius: 16px;
+            font-size: 14px;
+            outline: none;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            color: #000;
+        }
+
+        /* VALIDATION COLORS */
+        .field-input.valid {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: #22c55e;
+        }
+
+        .field-input.invalid {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+        }
+
+        #auth-submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .error-label {
+            font-size: 8px;
+            font-weight: 900;
+            color: #ef4444;
+            text-transform: uppercase;
+            margin-top: 4px;
+            margin-left: 8px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="bg-white">
+
+    <nav>
+        <div class="flex items-center gap-2">
+            <div class="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-[10px] font-black">N</div>
+            <span class="nav-brand-text">NAOMI ENGLISH SAT</span>
+        </div>
+        <div id="nav-actions">
+            <div id="logged-out-nav" class="flex gap-1.5">
+                <button onclick="openAuth(false)" class="nav-btn border border-black text-black px-4">Login</button>
+                <button onclick="openAuth(true)" class="nav-btn bg-black text-white px-4">Sign Up</button>
+            </div>
+            <div id="logged-in-nav" class="hidden flex items-center gap-2">
+                <div class="flex flex-col items-end">
+                    <span id="user-display" class="text-[8px] font-black uppercase text-black"></span>
+                    <div id="user-status"></div>
+                </div>
+                <button onclick="logout()" class="text-gray-300 hover:text-black p-1.5 transition-colors"><i class="fas fa-sign-out-alt text-xs"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <h1 class="hero-title">Naomi's English SAT</h1>
+        <p id="upgrade-banner" class="text-[11px] font-semibold text-gray-500 mb-6 px-4">
+            Test 1 & Solution 1 are free — 
+            <span class="text-black font-black underline cursor-pointer hover:opacity-70" onclick="handleUpgradeClick()">Get Full Access</span> for $0.50/year
+        </p>
+        <div id="materials-list" class="material-grid"></div>
+    </section>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal-overlay hidden">
+        <div class="compact-modal">
+            <button onclick="closeAuth()" class="absolute top-5 right-5 text-gray-300 hover:text-black transition-colors"><i class="fas fa-times"></i></button>
+            <h3 id="modal-title" class="text-xl font-black mb-1">Access</h3>
+            <p id="modal-subtitle" class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-6">Secure Gateway</p>
+            
+            <form id="auth-form" class="space-y-3" novalidate>
+                <!-- Email -->
+                <div>
+                    <input type="email" id="email" placeholder="Email Address" class="field-input" oninput="runValidation()" required>
+                    <div id="email-error" class="error-label hidden">Invalid email address</div>
+                </div>
+
+                <!-- Password Group -->
+                <div id="password-group">
+                    <input type="password" id="pass" placeholder="Password" class="field-input" oninput="runValidation()" required>
+                    <div id="forgot-password-link" class="flex justify-end mt-1">
+                        <span onclick="handlePasswordReset()" class="text-[8px] font-black text-gray-400 uppercase hover:text-black cursor-pointer">Forgot?</span>
+                    </div>
+                </div>
+
+                <!-- Signup Only Fields -->
+                <div id="signup-fields" class="hidden">
+                    <input type="password" id="pass-confirm" placeholder="Confirm Password" class="field-input" oninput="runValidation()">
+                    <div id="match-error" class="error-label hidden">Passwords do not match</div>
+                </div>
+
+                <!-- Status Messages -->
+                <p id="error-msg" class="hidden text-[9px] font-black uppercase text-center py-2 px-3 rounded-lg"></p>
+                
+                <button type="submit" id="auth-submit-btn" class="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-[0.98] transition-transform">
+                    <i id="auth-loader" class="fas fa-circle-notch fa-spin hidden mr-2"></i>
+                    <span id="auth-btn-text">Continue</span>
+                </button>
+            </form>
+            <button onclick="toggleAuthMode()" id="toggle-btn" class="w-full mt-4 text-[9px] font-black text-gray-300 uppercase tracking-widest hover:text-black transition-colors">Sign Up</button>
+        </div>
+    </div>
+
+    <!-- Terms Modal -->
+    <div id="terms-modal" class="modal-overlay hidden" style="z-index: 300;">
+        <div class="compact-modal text-center">
+            <h3 class="text-lg font-black mb-4">Terms & No-Refund Policy</h3>
+            <p class="text-[11px] font-medium text-gray-600 leading-relaxed mb-6">
+                The subscription is valid for a period of 365 days from the date of purchase. Due to the digital nature of the content, all sales are final and no refunds will be issued once access is granted.
+            </p>
+            <button onclick="closeTerms()" class="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase">Close</button>
+        </div>
+    </div>
+
+    <!-- Upgrade Modal -->
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="compact-modal text-center">
+            <button onclick="closeUpgradeModal()" class="absolute top-5 right-5 text-gray-300 hover:text-black transition-colors"><i class="fas fa-times"></i></button>
+            <div class="w-12 h-12 bg-black text-white rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg"><i class="fas fa-crown"></i></div>
+            <h3 class="text-xl font-black">Premium Access</h3>
+            <div class="bg-gray-50 p-6 rounded-3xl my-6">
+                <div class="text-3xl font-black">$0.50</div>
+                <div class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">One-year full access</div>
+            </div>
+            
+            <!-- Terms Checkbox -->
+            <label class="flex items-start gap-3 cursor-pointer text-left mb-6 px-2">
+                <input type="checkbox" id="terms-check" onchange="togglePayButton()" class="mt-1 h-4 w-4 rounded accent-black cursor-pointer">
+                <span class="text-[10px] font-bold text-gray-500 leading-tight">
+                    I agree to the <span onclick="openTerms(event)" class="text-black underline">Terms & No-Refund Policy</span>.
+                </span>
+            </label>
+
+            <!-- PayPal Container -->
+            <div id="payment-area" class="hidden">
+                <div id="paypal-button-container" class="bg-gray-100 py-3 rounded-xl text-[9px] font-black uppercase text-gray-400 border-2 border-dashed border-gray-200">
+                    PayPal Buttons Integration
+                </div>
+            </div>
+            
+            <p id="checkbox-hint" class="text-[9px] font-black text-red-500 uppercase">Check the box to pay</p>
+        </div>
+    </div>
+
+    <div id="viewer" class="fixed inset-0 z-[300] hidden bg-white flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center bg-white">
+            <span id="viewer-name" class="text-[9px] font-black uppercase text-gray-400 truncate max-w-[60%]"></span>
+            <button onclick="closeViewer()" class="bg-black text-white px-6 py-2 rounded-full text-[9px] font-black uppercase">Close</button>
+        </div>
+        <iframe id="pdf-frame" class="flex-1 w-full border-none"></iframe>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGIT_bZ6nfoJjfipsPygC-BW9LoZeFflI",
+            authDomain: "naomi-sat.firebaseapp.com",
+            projectId: "cmds-36e71",
+            storageBucket: "cmds-36e71.appspot.com",
+            messagingSenderId: "1036067758252", 
+            appId: "1:1036067758252:web:65e12f6a5e1d5a6b7d90c1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let isPremium = false;
+        let currentUser = null;
+        let materialsData = [];
+        let isSignUp = false;
+
+        function runValidation() {
+            const emailField = document.getElementById('email');
+            const passField = document.getElementById('pass');
+            const confirmField = document.getElementById('pass-confirm');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            
+            const emailVal = emailField.value.trim();
+            const passVal = passField.value;
+            const confirmVal = confirmField.value;
+
+            const emailRe = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            
+            let isValid = true;
+
+            if (emailVal.length > 0) {
+                if (emailRe.test(emailVal)) {
+                    emailField.className = "field-input valid";
+                    document.getElementById('email-error').classList.add('hidden');
+                } else {
+                    emailField.className = "field-input invalid";
+                    document.getElementById('email-error').classList.remove('hidden');
+                    isValid = false;
+                }
+            } else {
+                emailField.className = "field-input";
+                document.getElementById('email-error').classList.add('hidden');
+                isValid = false;
+            }
+
+            if (passVal.length >= 6) {
+                passField.className = "field-input valid";
+            } else if (passVal.length > 0) {
+                passField.className = "field-input invalid";
+                isValid = false;
+            } else {
+                passField.className = "field-input";
+                isValid = false;
+            }
+
+            if (isSignUp) {
+                if (confirmVal.length > 0) {
+                    if (confirmVal === passVal && passVal.length >= 6) {
+                        confirmField.className = "field-input valid";
+                        document.getElementById('match-error').classList.add('hidden');
+                    } else {
+                        confirmField.className = "field-input invalid";
+                        document.getElementById('match-error').classList.remove('hidden');
+                        isValid = false;
+                    }
+                } else {
+                    confirmField.className = "field-input";
+                    document.getElementById('match-error').classList.add('hidden');
+                    isValid = false;
+                }
+            }
+
+            submitBtn.disabled = !isValid;
+        }
+
+        // Forgot Password Handler
+        async function handlePasswordReset() {
+            const email = document.getElementById('email').value.trim();
+            const errorMsg = document.getElementById('error-msg');
+            
+            if (!email) {
+                errorMsg.innerText = "Please enter your email to reset password";
+                errorMsg.className = "text-[9px] font-black uppercase text-center py-2 px-3 rounded-lg bg-orange-50 text-orange-500";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                await auth.sendPasswordResetEmail(email);
+                errorMsg.innerText = "Reset email sent! Please check your inbox.";
+                errorMsg.className = "text-[9px] font-black uppercase text-center py-2 px-3 rounded-lg bg-green-50 text-green-500";
+                errorMsg.classList.remove('hidden');
+            } catch (err) {
+                errorMsg.innerText = err.message;
+                errorMsg.className = "text-[9px] font-black uppercase text-center py-2 px-3 rounded-lg bg-red-50 text-red-500";
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        // Terms Logic
+        function openTerms(e) {
+            e.preventDefault();
+            document.getElementById('terms-modal').classList.remove('hidden');
+        }
+        function closeTerms() {
+            document.getElementById('terms-modal').classList.add('hidden');
+        }
+        function togglePayButton() {
+            const isChecked = document.getElementById('terms-check').checked;
+            document.getElementById('payment-area').classList.toggle('hidden', !isChecked);
+            document.getElementById('checkbox-hint').classList.toggle('hidden', isChecked);
+        }
+
+        function closeUpgradeModal() {
+            document.getElementById('profile-modal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            if (user) {
+                db.collection('users').doc(user.uid).onSnapshot(doc => {
+                    const data = doc.data() || {};
+                    isPremium = !!data.isPremium;
+                    renderMaterials();
+                    updateNav(user, isPremium);
+                    document.getElementById('upgrade-banner').classList.toggle('hidden', isPremium);
+                });
+            } else {
+                isPremium = false;
+                renderMaterials();
+                updateNav(null);
+            }
+        });
+
+        async function fetchMaterials() {
+            const snap = await db.collection('materials').orderBy('id', 'asc').get();
+            materialsData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderMaterials();
+        }
+
+        function renderMaterials() {
+            const list = document.getElementById('materials-list');
+            if (materialsData.length === 0) { fetchMaterials(); return; }
+            list.innerHTML = '';
+            for (let i = 0; i < materialsData.length; i += 2) {
+                const row = document.createElement('div');
+                row.className = 'material-row';
+                const m1 = materialsData[i];
+                const m2 = materialsData[i+1];
+                const l1 = !m1.free && !isPremium;
+                const l2 = m2 ? (!m2.free && !isPremium) : false;
+                
+                row.innerHTML = `
+                    <div class="material-card ${l1 ? 'locked' : ''} active:scale-95" onclick="handleOpen('${m1.url}', '${m1.title}', ${l1})">
+                        ${l1 ? '<i class="fas fa-lock"></i>' : ''}<span>${m1.title}</span>
+                    </div>
+                    ${m2 ? `<div class="material-card ${l2 ? 'locked' : ''} active:scale-95" onclick="handleOpen('${m2.url}', '${m2.title}', ${l2})">
+                        ${l2 ? '<i class="fas fa-lock"></i>' : ''}<span>${m2.title}</span>
+                    </div>` : ''}
+                `;
+                list.appendChild(row);
+            }
+        }
+
+        function handleOpen(url, title, locked) {
+            if (locked) handleUpgradeClick();
+            else {
+                document.getElementById('viewer-name').innerText = title;
+                document.getElementById('pdf-frame').src = url.includes('/view') ? url.replace(/\/view.*$/, '/preview') : url;
+                document.getElementById('viewer').classList.remove('hidden');
+                document.body.classList.add('modal-open');
+            }
+        }
+
+        function handleUpgradeClick() {
+            if (!currentUser) { openAuth(false); return; }
+            document.getElementById('profile-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function openAuth(s) { 
+            isSignUp = s; 
+            updateModalUI();
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+            runValidation();
+        }
+
+        function toggleAuthMode() { 
+            isSignUp = !isSignUp; 
+            updateModalUI();
+            runValidation();
+        }
+
+        function updateModalUI() {
+            document.getElementById('modal-title').innerText = isSignUp ? "Sign Up" : "Login";
+            document.getElementById('signup-fields').classList.toggle('hidden', !isSignUp);
+            document.getElementById('forgot-password-link').classList.toggle('hidden', isSignUp);
+            document.getElementById('toggle-btn').innerText = isSignUp ? "Already a student? Login" : "New Student? Sign Up";
+            document.getElementById('error-msg').classList.add('hidden');
+        }
+
+        document.getElementById('auth-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const pass = document.getElementById('pass').value;
+            const submitBtn = document.getElementById('auth-btn-text');
+            const loader = document.getElementById('auth-loader');
+
+            loader.classList.remove('hidden');
+            submitBtn.innerText = "Processing...";
+
+            try {
+                if (isSignUp) {
+                    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                    await db.collection('users').doc(cred.user.uid).set({ email, isPremium: false });
+                } else {
+                    await auth.signInWithEmailAndPassword(email, pass);
+                }
+                closeAuth();
+            } catch (err) {
+                const msg = document.getElementById('error-msg');
+                msg.innerText = err.message;
+                msg.className = "text-[9px] font-black uppercase text-center py-2 px-3 rounded-lg bg-red-50 text-red-500";
+                msg.classList.remove('hidden');
+            } finally {
+                loader.classList.add('hidden');
+                submitBtn.innerText = "Continue";
+            }
+        };
+
+        function closeAuth() { document.getElementById('auth-modal').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+        function closeViewer() { document.getElementById('viewer').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+        function logout() { auth.signOut(); }
+        
+        function updateNav(u, p) {
+            document.getElementById('logged-out-nav').classList.toggle('hidden', !!u);
+            document.getElementById('logged-in-nav').classList.toggle('hidden', !u);
+            if (u) {
+                document.getElementById('user-display').innerText = u.email.split('@')[0];
+                document.getElementById('user-status').innerHTML = p ? 
+                    '<span class="text-[7px] font-black bg-black text-white px-2 py-0.5 rounded uppercase">Premium</span>' : 
+                    '<span class="text-[7px] font-black bg-gray-100 text-gray-400 px-2 py-0.5 rounded uppercase">Standard</span>';
+            }
+        }
+    </script>
+</body>
+</html>
